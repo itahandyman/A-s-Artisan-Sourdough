@@ -15,7 +15,8 @@ const MENU = [
     name: "Sourdough Bagels",
     icon: "🥯",
     items: [
-      { id: "bagels-4", name: "Bagels — Sesame, Cheese or Cheese & Chilli (box of 4)", price: 6.00 },
+      { id: "bagel-sesame-cheese", name: "Sesame & Cheese Bagels (box of 4)", price: 6.00 },
+      { id: "bagel-cheese-chilli", name: "Cheese & Chilli Bagels (box of 4)", price: 6.00 },
     ],
   },
   {
@@ -23,21 +24,46 @@ const MENU = [
     icon: "🥐",
     badge: "New",
     items: [
-      { id: "brioche-vanilla-4", name: "Madagascan Vanilla Custard & Choc Chip (4)", price: 12.00 },
-      { id: "brioche-vanilla-8", name: "Madagascan Vanilla Custard & Choc Chip (8)", price: 20.00 },
-      { id: "brioche-frangipani-4", name: "Frangipani & Almond (4)", price: 12.00, nuts: true },
-      { id: "brioche-frangipani-8", name: "Frangipani & Almond (8)", price: 20.00, nuts: true },
+      {
+        id: "brioche-vanilla",
+        name: "Madagascan Vanilla Custard & Choc Chip",
+        packs: [
+          { label: "4 pack", price: 12.00 },
+          { label: "8 pack", price: 20.00 },
+        ],
+      },
+      {
+        id: "brioche-frangipani",
+        name: "Frangipani & Almond",
+        nuts: true,
+        packs: [
+          { label: "4 pack", price: 12.00 },
+          { label: "8 pack", price: 20.00 },
+        ],
+      },
     ],
   },
   {
     name: "Sweet Treats",
     icon: "🧁",
     items: [
-      { id: "muffins-4", name: "Blueberry & Lemon Muffins (box of 4)", price: 6.00 },
-      { id: "muffins-12", name: "Blueberry & Lemon Muffins (box of 12)", price: 15.00 },
-      { id: "cookie-1", name: "Sourdough Cookie — Single", price: 1.50 },
-      { id: "cookies-6", name: "Sourdough Cookies (box of 6)", price: 6.00 },
-      { id: "cookies-12", name: "Sourdough Cookies (box of 12)", price: 12.00 },
+      {
+        id: "muffins",
+        name: "Blueberry & Lemon Muffins",
+        packs: [
+          { label: "Box of 4", price: 6.00 },
+          { label: "Box of 12", price: 15.00 },
+        ],
+      },
+      {
+        id: "cookies",
+        name: "Sourdough Cookies",
+        packs: [
+          { label: "Single", price: 1.50 },
+          { label: "Box of 6", price: 6.00 },
+          { label: "Box of 12", price: 12.00 },
+        ],
+      },
     ],
   },
   {
@@ -54,15 +80,27 @@ const BUNDLES = [
     name: "Bundle Deals",
     icon: "🌾",
     items: [
-      { id: "bundle-breakfast", name: "Breakfast Bundle — 4 Bagels + Muffin Box", price: 10.00 },
-      { id: "bundle-family", name: "Family Favourite — Classic Loaf + Bagels + Cookies", price: 15.00 },
-      { id: "bundle-sweet", name: "Sweet Treat Bundle — Muffins + 6 Cookies", price: 11.00 },
-      { id: "bundle-lovers", name: "Bakery Lovers Bundle — Any 2 Loaves + 4 Muffins + 4 Bagels", tag: "Best Value", price: 20.00 },
+      { id: "bundle-breakfast", name: "Breakfast Bundle: 4 Bagels + Muffin Box", price: 10.00 },
+      { id: "bundle-family", name: "Family Favourite: Classic Loaf + Bagels + Cookies", price: 15.00 },
+      { id: "bundle-sweet", name: "Sweet Treat Bundle: Muffins + 6 Cookies", price: 11.00 },
+      { id: "bundle-lovers", name: "Bakery Lovers Bundle: Any 2 Loaves + 4 Muffins + 4 Bagels", tag: "Best Value", price: 20.00 },
     ],
   },
 ];
 
-const ALL_ITEMS = [...MENU, ...BUNDLES].flatMap((group) => group.items);
+const ITEM_LOOKUP = new Map();
+[...MENU, ...BUNDLES].forEach((group) => {
+  group.items.forEach((item) => {
+    if (item.packs) {
+      item.packs.forEach((pack, idx) => {
+        ITEM_LOOKUP.set(`${item.id}::${idx}`, { name: `${item.name} (${pack.label})`, price: pack.price });
+      });
+    } else {
+      ITEM_LOOKUP.set(item.id, { name: item.name, price: item.price });
+    }
+  });
+});
+
 const order = new Map();
 
 function money(n) {
@@ -87,18 +125,42 @@ function renderGroups(groups, container) {
     group.items.forEach((item) => {
       const row = document.createElement("div");
       row.className = "menu-item";
-      row.innerHTML = `
-        <div class="menu-item-info">
-          <span class="menu-item-name">${item.name}${item.nuts ? ` <span title="Contains nuts" aria-label="Contains nuts">🥜</span>` : ""}</span>
-          ${item.tag ? `<span class="menu-item-tag">${item.tag}</span>` : ""}
-        </div>
-        <span class="menu-item-price">${money(item.price)}</span>
-        <div class="stepper" data-id="${item.id}">
-          <button type="button" class="stepper-minus" aria-label="Remove one ${item.name}">&minus;</button>
-          <span class="stepper-qty">0</span>
-          <button type="button" class="stepper-plus" aria-label="Add one ${item.name}">+</button>
-        </div>
-      `;
+      const nutsIcon = item.nuts ? ` <span title="Contains nuts" aria-label="Contains nuts">🥜</span>` : "";
+
+      if (item.packs) {
+        const stepperId = `${item.id}::0`;
+        row.innerHTML = `
+          <div class="menu-item-info">
+            <span class="menu-item-name">${item.name}${nutsIcon}</span>
+            ${item.tag ? `<span class="menu-item-tag">${item.tag}</span>` : ""}
+          </div>
+          <div class="menu-item-controls">
+            <select class="pack-select" data-item-id="${item.id}" aria-label="Pack size for ${item.name}">
+              ${item.packs.map((p, i) => `<option value="${i}">${p.label}: ${money(p.price)}</option>`).join("")}
+            </select>
+            <div class="stepper" data-id="${stepperId}">
+              <button type="button" class="stepper-minus" aria-label="Remove one ${item.name}" disabled>&minus;</button>
+              <span class="stepper-qty">0</span>
+              <button type="button" class="stepper-plus" aria-label="Add one ${item.name}">+</button>
+            </div>
+          </div>
+        `;
+      } else {
+        row.innerHTML = `
+          <div class="menu-item-info">
+            <span class="menu-item-name">${item.name}${nutsIcon}</span>
+            ${item.tag ? `<span class="menu-item-tag">${item.tag}</span>` : ""}
+          </div>
+          <div class="menu-item-controls">
+            <span class="menu-item-price">${money(item.price)}</span>
+            <div class="stepper" data-id="${item.id}">
+              <button type="button" class="stepper-minus" aria-label="Remove one ${item.name}" disabled>&minus;</button>
+              <span class="stepper-qty">0</span>
+              <button type="button" class="stepper-plus" aria-label="Add one ${item.name}">+</button>
+            </div>
+          </div>
+        `;
+      }
       card.appendChild(row);
     });
 
@@ -107,8 +169,7 @@ function renderGroups(groups, container) {
 }
 
 function setQty(id, qty) {
-  const item = ALL_ITEMS.find((i) => i.id === id);
-  if (!item) return;
+  if (!ITEM_LOOKUP.has(id)) return;
   if (qty <= 0) {
     order.delete(id);
   } else {
@@ -142,11 +203,11 @@ function renderOrder() {
   if (order.size === 0) {
     const li = document.createElement("li");
     li.className = "order-empty";
-    li.textContent = "Your order is empty — add items from the menu above.";
+    li.textContent = "Your order is empty. Add items from the menu above.";
     list.appendChild(li);
   } else {
     order.forEach((qty, id) => {
-      const item = ALL_ITEMS.find((i) => i.id === id);
+      const item = ITEM_LOOKUP.get(id);
       if (!item) return;
       const lineTotal = item.price * qty;
       total += lineTotal;
@@ -181,7 +242,7 @@ function buildMessage() {
   const lines = ["Hi! I'd like to order the following from A's Artisan Sourdough:", ""];
   let total = 0;
   order.forEach((qty, id) => {
-    const item = ALL_ITEMS.find((i) => i.id === id);
+    const item = ITEM_LOOKUP.get(id);
     if (!item) return;
     const lineTotal = item.price * qty;
     total += lineTotal;
@@ -200,6 +261,18 @@ function initSteppers(container) {
     const id = stepper.dataset.id;
     const current = getQty(id);
     setQty(id, plus ? current + 1 : Math.max(0, current - 1));
+  });
+
+  container.addEventListener("change", (e) => {
+    const select = e.target.closest(".pack-select");
+    if (!select) return;
+    const itemId = select.dataset.itemId;
+    const newId = `${itemId}::${select.value}`;
+    const stepper = select.closest(".menu-item").querySelector(".stepper");
+    stepper.dataset.id = newId;
+    const qty = getQty(newId);
+    stepper.querySelector(".stepper-qty").textContent = String(qty);
+    stepper.querySelector(".stepper-minus").disabled = qty <= 0;
   });
 }
 
